@@ -47,6 +47,17 @@ sudo apt-mark hold modemmanager libmm-glib0   # security updates then need re-pa
 
 The script expects a NetworkManager GSM connection named `radost` (APN `o2internet`, `ipv6.method disabled`); edit to match your carrier.
 
+## Testing the ModemManager fix without rebooting
+
+```sh
+test/test-lte-cycle.sh -n 10 -m patched   # 10 power cycles of the modem with the installed (patched) MM
+test/test-lte-cycle.sh -n 20 -m ab        # stock vs. patched, 20 cycles each, ends with the patched build installed
+```
+
+Uses the original `uconsole-4g-cm4.sh.orig` for power sequencing (so the workarounds do not mask failures), writes
+`results.csv` (result, time-to-ready, number of MM retries per cycle) and prints a summary. Each cycle takes 2-3 minutes,
+drops the LTE link, and should be run on a charger. `stock`/`ab` install the Debian ModemManager `.deb` temporarily.
+
 ## Related discussions
 
 No ready-made fix for these uConsole problems turned up in forums, but the following threads describe the same symptoms:
