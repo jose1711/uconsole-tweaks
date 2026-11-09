@@ -47,6 +47,17 @@ sudo apt-mark hold modemmanager libmm-glib0   # security updates then need re-pa
 
 The script expects a NetworkManager GSM connection named `radost` (APN `o2internet`, `ipv6.method disabled`); edit to match your carrier.
 
+## Related discussions
+
+No ready-made fix for these uConsole problems turned up in forums, but the following threads describe the same symptoms:
+
+- "IPv4 is unsupported by the modem" / empty supported IP families on other modems:
+  [modemmanager-devel, Mar 2024](https://lists.freedesktop.org/archives/modemmanager-devel/2024-March/009845.html),
+  [modemmanager-devel, Feb 2024](https://lists.freedesktop.org/archives/modemmanager-devel/2024-February/009836.html),
+  [ModemManager issue 705](https://gitlab.freedesktop.org/mobile-broadband/ModemManager/-/issues/705) (u-blox R412m, IP capabilities not detected over serial)
+- uConsole 4G module setup (modem detection): [ClockworkPi forum](https://forum.clockworkpi.com/t/how-do-i-configure-use-the-4g-module/10431)
+- uConsole with an HDMI monitor (manual ARandR layout): [ClockworkPi forum](https://forum.clockworkpi.com/t/uconsole-with-hdmi-portable-monitor/13893)
+
 ## License
 
 MIT for the scripts. The patches are derived from ModemManager (GPL-2.0+) and the uConsole packages and stay under their licenses.
