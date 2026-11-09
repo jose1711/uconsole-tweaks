@@ -12,7 +12,8 @@
 #   -f  run even on battery / with LTE as default route
 #
 # Uses the ORIGINAL uconsole-4g-cm4.sh.orig for power sequencing so the local
-# workarounds (MM restart, nmcli con up) cannot mask failures. Each cycle takes ~2-3 min.
+# workarounds (MM restart) cannot mask failures. Stage 1 waits for ModemManager to
+# initialise the modem, stage 2 runs "nmcli con up" and checks that it connects. Each cycle takes ~2-3 min.
 # WARNING: drops the LTE link; run on a charger (USB hub brownouts on battery).
 
 N=10; MODE=patched; OUT=; FORCE=0
@@ -48,33 +49,37 @@ restore() { dpkg-query -W -f='${Version}' modemmanager | grep -q jose1 || { echo
 trap 'echo; echo interrupted; restore; exit 130' INT TERM
 
 state() { mmcli -m any --output-keyvalue 2>/dev/null; }
-nm_up() { nmcli -t -f DEVICE,STATE dev | grep -qE '^ttyUSB[0-9]+:(connected|pripojené)'; }
 
 one_cycle() { # variant idx
-  local start result="" t0 kv fam st retries ready=-1
-  sudo nmcli con down "$CON" >/dev/null 2>&1
+  local start result="" t0 kv fam st retries ready=-1 conn=-1
   "$RAW" disable >/dev/null 2>&1
   start=$(date '+%Y-%m-%d %H:%M:%S'); t0=$SECONDS
   "$RAW" enable >/dev/null 2>&1
+  # stage 1: ModemManager initialises the modem (state not failed, IP families loaded)
   while [ $((SECONDS - t0)) -lt $((READY_TIMEOUT + 20)) ]; do
     kv=$(state)
     if [ -n "$kv" ]; then
       st=$(awk -F': ' '/^modem.generic.state +:/{print $2; exit}' <<<"$kv")
       grep -qE 'supported-ip-families +: --' <<<"$kv" && fam=empty || fam=ok
       [ "$st" = failed ] && break
-      if [ "$fam" = ok ] && nm_up; then ready=$((SECONDS - t0)); break; fi
+      if [ "$fam" = ok ] && [ "$st" != initializing ] && [ "$st" != unknown ]; then ready=$((SECONDS - t0)); break; fi
     fi
     sleep 3
   done
-  kv=$(state)
-  if [ $ready -ge 0 ]; then result=OK
-  elif [ -z "$kv" ]; then result=FAIL_NO_MODEM
-  elif grep -qE 'modem.generic.state +: failed' <<<"$kv"; then result=FAIL_STATE_FAILED
-  elif grep -qE 'supported-ip-families +: --' <<<"$kv"; then result=FAIL_EMPTY_IP_FAMILIES
-  else result=FAIL_NM_NOT_CONNECTED; fi
+  # stage 2: bring the connection up (what the user does in practice)
+  if [ $ready -ge 0 ]; then
+    t1=$SECONDS
+    if sudo nmcli -w 60 con up "$CON" >/dev/null 2>&1; then conn=$((SECONDS - t1)); result=OK; else result=FAIL_CONNECT; fi
+  else
+    kv=$(state)
+    if [ -z "$kv" ]; then result=FAIL_NO_MODEM
+    elif grep -qE 'modem.generic.state +: failed' <<<"$kv"; then result=FAIL_STATE_FAILED
+    elif grep -qE 'supported-ip-families +: --' <<<"$kv"; then result=FAIL_EMPTY_IP_FAMILIES
+    else result=FAIL_NOT_READY; fi
+  fi
   retries=$(journalctl -u ModemManager --since "$start" --no-pager -q 2>/dev/null | grep -c "couldn.t load supported IP families, retrying")
-  echo "$1,$2,$result,$ready,$retries,$start" >> "$CSV"
-  printf '%-8s #%-3s %-26s ready=%ss retries=%s\n' "$1" "$2" "$result" "$ready" "$retries"
+  echo "$1,$2,$result,$ready,$conn,$retries,$start" >> "$CSV"
+  printf '%-8s #%-3s %-24s mm_ready=%ss connect=%ss retries=%s\n' "$1" "$2" "$result" "$ready" "$conn" "$retries"
 }
 
 run_variant() {
@@ -84,14 +89,14 @@ run_variant() {
 
 summary() {
   echo; echo "== summary ($CSV) =="
-  awk -F, 'NR>1{n[$1]++; if($3=="OK"){ok[$1]++; s[$1]+=$4} else f[$1" "$3]++; r[$1]+=$5; if($5>0)rc[$1]++}
-    END{for(v in n){printf "%-8s cycles=%d ok=%d (%.0f%%) avg_ready=%.0fs cycles_with_retry=%d total_retries=%d\n",
+  awk -F, 'NR>1{n[$1]++; if($3=="OK"){ok[$1]++; s[$1]+=$4} else f[$1" "$3]++; if($6>0){rc[$1]++; r[$1]+=$6}}
+    END{for(v in n){printf "%-8s cycles=%d ok=%d (%.0f%%) avg_mm_ready=%.0fs cycles_with_mm_retry=%d total_retries=%d\n",
         v,n[v],ok[v],100*ok[v]/n[v],(ok[v]?s[v]/ok[v]:0),rc[v],r[v]}
       for(k in f) printf "  %s: %d\n",k,f[k]}' "$CSV"
-  echo "Note: SIM not inserted / unknown-capabilities and power brownouts are separate issues; check journalctl for them."
+  echo "FAIL_EMPTY_IP_FAMILIES = the bug the patch fixes; FAIL_STATE_FAILED = other init failures (not fixed by the patch)."
 }
 
-echo "variant,cycle,result,ready_s,mm_retries,started" > "$CSV"
+echo "variant,cycle,result,mm_ready_s,connect_s,mm_retries,started" > "$CSV"
 case $MODE in
   stock) run_variant stock; restore;;
   patched) run_variant patched;;

@@ -55,7 +55,7 @@ test/test-lte-cycle.sh -n 20 -m ab        # stock vs. patched, 20 cycles each, e
 ```
 
 Uses the original `uconsole-4g-cm4.sh.orig` for power sequencing (so the workarounds do not mask failures), writes
-`results.csv` (result, time-to-ready, number of MM retries per cycle) and prints a summary. Each cycle takes 2-3 minutes,
+`results.csv` (result, ModemManager time-to-ready, connect time, MM retries per cycle) and prints a summary. Each cycle takes 2-3 minutes,
 drops the LTE link, and should be run on a charger. `stock`/`ab` install the Debian ModemManager `.deb` temporarily.
 
 ## Related discussions
