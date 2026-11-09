@@ -1,0 +1,56 @@
+Description: retry loading supported IP families during initialization
+ SIMCom SIM7600 answers +CGDCONT=? with an error while its firmware is still
+ booting. The supported IP families then stay empty forever and NetworkManager
+ refuses every connection ("IPv4 is unsupported by the modem").
+Author: local
+---
+--- a/src/mm-iface-modem.c
++++ b/src/mm-iface-modem.c
+@@ -5046,6 +5046,7 @@
+     MMModemCharset supported_charsets;
+     const MMModemCharset *current_charset;
+     GError *fatal_error;
++    guint ip_families_retries;
+ };
+ 
+ static void
+@@ -5294,6 +5295,17 @@
+     interface_initialization_step (task);
+ }
+ 
++#define SUPPORTED_IP_FAMILIES_MAX_RETRIES        15
++#define SUPPORTED_IP_FAMILIES_RETRY_TIMEOUT_SECS 2
++
++static gboolean
++load_supported_ip_families_retry (GTask *task)
++{
++    /* step not advanced, so the same step is run again */
++    interface_initialization_step (task);
++    return G_SOURCE_REMOVE;
++}
++
+ static void
+ load_supported_ip_families_ready (MMIfaceModem *self,
+                                   GAsyncResult *res,
+@@ -5313,6 +5325,21 @@
+     if (error)
+         mm_obj_dbg (self, "couldn't load supported IP families: %s", error->message);
+ 
++    /* Some modems (e.g. SIMCom SIM7600) are exposed on USB well before their
++     * firmware is ready and reply with an error to +CGDCONT=?. Leaving the
++     * supported IP families empty makes every connection attempt fail later,
++     * so retry for a while before giving up. */
++    if (ip_families == MM_BEARER_IP_FAMILY_NONE &&
++        ctx->ip_families_retries < SUPPORTED_IP_FAMILIES_MAX_RETRIES) {
++        ctx->ip_families_retries++;
++        mm_obj_msg (self, "couldn't load supported IP families, retrying in %u seconds (%u/%u)",
++                    SUPPORTED_IP_FAMILIES_RETRY_TIMEOUT_SECS,
++                    ctx->ip_families_retries, SUPPORTED_IP_FAMILIES_MAX_RETRIES);
++        g_timeout_add_seconds (SUPPORTED_IP_FAMILIES_RETRY_TIMEOUT_SECS,
++                               (GSourceFunc)load_supported_ip_families_retry, task);
++        return;
++    }
++
+     /* Go on to next step */
+     ctx->step++;
+     interface_initialization_step (task);

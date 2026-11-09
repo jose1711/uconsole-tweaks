@@ -1,0 +1,68 @@
+--- uconsole-4g-cm4.sh.orig	2024-05-24 22:40:28.000000000 +0200
++++ uconsole-4g-cm4.sh	2026-11-09 14:08:36.157925161 +0100
+@@ -1,5 +1,14 @@
+ #!/bin/bash
+ 
++function notify {
++        # notify <urgency> <title> <body>
++        echo "[$1] $2: $3"
++        local icon=network-cellular
++        [ "$1" = critical ] && icon=dialog-warning
++        command -v notify-send >/dev/null && \
++                notify-send -a LTE -i "$icon" -u "$1" "$2" "$3" 2>/dev/null
++}
++
+ function tip {
+ 
+ echo "use mmcli -L to see 4G modem or not"
+@@ -8,6 +17,7 @@
+ function enable4g {
+ 
+ echo "Power on 4G module on uConsole cm4"
++start=$(date '+%Y-%m-%d %H:%M:%S')
+ 
+ sudo pinctrl set 24 op dh
+ 
+@@ -16,8 +26,40 @@
+ sleep 5
+ sudo pinctrl set 15 dl
+ 
+-echo "waiting..."
+-sleep 13
++echo "waiting for ModemManager to pick up the modem..."
++# MM often probes the SIM7600 before its firmware is ready; the modem then ends
++# up 'failed' or with empty supported-ip-families and NM refuses to connect
++# ("IPv4 is unsupported by the modem"). Detect that and let MM re-probe.
++for i in $(seq 60); do
++        mmcli -m any >/dev/null 2>&1 && break
++        sleep 1
++done
++sleep 5
++kv=$(mmcli -m any --output-keyvalue 2>/dev/null)
++if [ -z "$kv" ] || grep -qE '^modem.generic.state +: failed|supported-ip-families +: --' <<<"$kv"; then
++        reason=$(grep -E '^modem.generic.state-failed-reason|^modem.generic.state ' <<<"$kv" | awk -F': ' '{print $2}' | grep -vx -- '--' | xargs)
++        grep -q 'supported-ip-families +: --' <<<"$kv" && reason="$reason, empty supported-ip-families"
++        [ -z "$kv" ] && reason="modem not found by ModemManager"
++        notify critical "LTE workaround: ModemManager restart" "Modem not initialized properly ($reason). Restarting ModemManager."
++        sudo systemctl restart ModemManager
++        for i in $(seq 30); do
++                mmcli -m any --output-keyvalue 2>/dev/null | grep -q 'supported-ip-families.value' && break
++                sleep 1
++        done
++fi
++is_up() { nmcli -t -f DEVICE,STATE dev | grep -qE '^ttyUSB[0-9]+:(connected|pripojené)'; }
++for i in $(seq 15); do is_up && break; sleep 1; done
++if ! is_up; then
++        notify critical "LTE workaround: nmcli con up" "NetworkManager did not connect 'radost' on its own, activating manually."
++        sudo nmcli con up radost
++fi
++retries=$(journalctl -u ModemManager --since "$start" --no-pager -q 2>/dev/null | grep -c 'couldn.t load supported IP families, retrying')
++[ "$retries" -gt 0 ] && notify normal "LTE: ModemManager patch used" "Supported IP families loaded after $retries $([ "$retries" -eq 1 ] && echo retry || echo retries) (journalctl -u ModemManager --since '$start')."
++if is_up; then
++        echo "connected"
++else
++        notify critical "LTE not connected" "Modem is still not connected. Check: journalctl -u ModemManager -u NetworkManager --since '$start'"
++fi
+ echo "done"
+ 
+ }

@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Display auto
+Comment=Internal panel rotation, external-display-only mode, no blanking with HDMI
+Exec=@BINDIR@/display-auto
+X-GNOME-Autostart-enabled=true
+NoDisplay=false

@@ -1,0 +1,79 @@
+#!/bin/bash
+# display-auto: keep uConsole displays sane without manual fiddling.
+#
+# Reacts to RandR events (cable plugged/unplugged, panel re-detected after the
+# power button wakes the screen) and enforces:
+#   - external display connected  -> only the external display is used,
+#                                    internal panel off, no idle blanking
+#                                    (xfce4-power-manager presentation mode)
+#   - no external display         -> internal panel on, rotated right,
+#                                    normal idle blanking
+# The power button (sleep-remap-powerkey) ignores short presses while an
+# external display is connected; that check lives in
+# /usr/local/lib/uconsole-sleep/sleep_remap_powerkey.py.
+#
+# Started from ~/.config/autostart/display-auto.desktop.
+
+INTERNAL=DSI-1
+ROTATION=right
+DEBOUNCE=1    # seconds of quiet after the last RandR event before acting
+
+log() { echo "display-auto: $*"; logger -t display-auto -- "$*"; }
+
+set_presentation() {
+        local cur
+        cur=$(xfconf-query -c xfce4-power-manager -p /xfce4-power-manager/presentation-mode 2>/dev/null)
+        [ "$cur" = "$1" ] && return
+        xfconf-query -c xfce4-power-manager -p /xfce4-power-manager/presentation-mode -n -t bool -s "$1"
+        log "presentation mode -> $1"
+}
+
+apply() {
+        local q ext internal_line
+        q=$(xrandr --query) || return
+        # first connected output that is not the internal panel
+        ext=$(awk -v i="$INTERNAL" '$2 == "connected" && $1 != i {print $1; exit}' <<<"$q")
+        internal_line=$(grep -E "^$INTERNAL " <<<"$q")
+
+        if [ -n "$ext" ]; then
+                # external only: enable it if it has no mode yet, switch the panel off
+                if ! grep -qE "^$ext connected (primary )?[0-9]+x[0-9]+\+" <<<"$q"; then
+                        log "external $ext connected, enabling it"
+                        xrandr --output "$ext" --auto --primary --pos 0x0
+                fi
+                if grep -qE "^$INTERNAL connected (primary )?[0-9]+x[0-9]+\+" <<<"$internal_line"; then
+                        log "turning $INTERNAL off (external $ext in use)"
+                        xrandr --output "$ext" --auto --primary --pos 0x0 --output "$INTERNAL" --off
+                fi
+                set_presentation true
+        else
+                # internal only; the panel reads "disconnected" while the power
+                # button has the screen off, leave it alone then
+                if grep -qE "^$INTERNAL connected" <<<"$internal_line"; then
+                        if ! grep -qE "^$INTERNAL connected (primary )?[0-9]+x[0-9]+\+[0-9]+\+[0-9]+ $ROTATION \(" <<<"$internal_line"; then
+                                log "restoring $INTERNAL ($ROTATION)"
+                                xrandr --output "$INTERNAL" --auto --rotate "$ROTATION" --pos 0x0 --primary
+                        fi
+                fi
+                set_presentation false
+        fi
+}
+
+command -v xev >/dev/null || { log "xev missing"; exit 1; }
+log "started"
+apply
+
+# xev prints a few lines per RandR event; act once things have settled
+pending=0
+while true; do
+        if IFS= read -r -t "$DEBOUNCE" _line; then
+                pending=1
+        else
+                rc=$?
+                [ $rc -le 128 ] && { log "xev exited, stopping"; exit 0; }  # EOF: X is gone
+                if [ $pending = 1 ]; then
+                        pending=0
+                        apply
+                fi
+        fi
+done < <(xev -root -event randr)

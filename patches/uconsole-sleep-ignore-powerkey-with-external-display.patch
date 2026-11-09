@@ -1,0 +1,53 @@
+--- sleep_remap_powerkey.py.distrib	2026-04-14 21:38:53.000000000 +0200
++++ sleep_remap_powerkey.py	2026-11-09 16:43:21.008188720 +0100
+@@ -4,10 +4,34 @@
+ import select
+ import uinput
+ import threading
++import glob
+ from time import time
+ 
+ from find_power_key import find_power_key
+-from sleep_display_control import toggle_display
++from sleep_display_control import toggle_display, status_path
++
++
++def external_display_connected():
++    # any connected DRM connector other than the internal DSI panel
++    for p in glob.glob("/sys/class/drm/card*-*/status"):
++        name = p.split("/")[-2]
++        if "-DSI-" in name or "Writeback" in name:
++            continue
++        try:
++            with open(p) as f:
++                if f.read().strip() == "connected":
++                    return True
++        except OSError:
++            pass
++    return False
++
++
++def screen_is_on():
++    try:
++        with open(status_path) as f:
++            return f.read().strip() != "4"
++    except OSError:
++        return True
+ 
+ 
+ EVENT_DEVICE = find_power_key()
+@@ -63,7 +87,13 @@
+                                 < HOLD_TRIGGER_SEC
+                             ):
+                                 input_power_timer.cancel()
+-                                toggle_display()
++                                # local change: with an external display the
++                                # short press must not blank/re-detect the
++                                # panel; still allow waking a blanked screen
++                                if external_display_connected() and screen_is_on():
++                                    print("SRP: external display connected, ignoring short press.")
++                                else:
++                                    toggle_display()
+ 
+     finally:
+         epoll.unregister(f.fileno())
