@@ -107,6 +107,9 @@ workarounds cannot fix them:
 
 I found no ready-made fix for these uConsole problems. These threads are related:
 
+- Upstream report of the ModemManager issue fixed by the patch here:
+  [ModemManager #1120](https://gitlab.freedesktop.org/mobile-broadband/ModemManager/-/work_items/1120)
+
 - The same intermittent error on a uConsole ("connection requested both IPv4 and IPv6 dual stack addressing which is
   unsupported by the modem", which later went away by itself):
   [ClockworkPi forum, Apr 2026](https://forum.clockworkpi.com/t/4g-problem-with-trixie-6-12-and-telekom/22234)
