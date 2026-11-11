@@ -73,6 +73,32 @@ drops the LTE link, and should be run on a charger. `stock`/`ab` install the Deb
 - The single patched connection failure came from the test itself: `nmcli con up` interrupted an activation
   NetworkManager had just started on its own (`primary AT port is already connected`), not from ModemManager.
 
+## Other reasons the modem can fail
+
+The ModemManager patch only fixes the early-probe race. Some failures have nothing to do with software, and the
+workarounds cannot fix them:
+
+- **Low battery / weak power supply.** The SIM7600 draws short current peaks of up to about 2 A when its radio
+  transmits. On battery the voltage can then sag so far that the internal USB hub resets. The kernel logs
+  `usb usb1-port1: disabled by hub (EMI?), re-enabling...`, and the modem *and the keyboard* drop off USB together.
+  In my tests this happened on battery at about 3.57 V, usually right after ModemManager (re)started and the modem
+  began registering. Sometimes the hub did not come back at all, and only a reboot recovered it. Test and use LTE on a
+  charger or a well-charged battery if possible.
+  Check with: `journalctl -k | grep -E 'usb1-port1|USB disconnect'` and
+  `cat /sys/class/power_supply/axp20x-battery/voltage_now`.
+- **Weak signal (small or badly placed antenna).** The modem transmits at higher power when the signal is weak, which
+  makes the current peaks above worse. Registration or the PDP context can also time out
+  (`failed to connect modem: Network timeout`), and the modem may reset and re-enumerate on USB again and again.
+  A larger external antenna, a better position (near a window, not covered by a hand or a case) or another band or
+  operator helps.
+  Check with: `mmcli -m any | grep -E 'signal|access tech'`, or for detailed values
+  `mmcli -m any --signal-setup=5 && mmcli -m any --signal-get` (RSRP/RSRQ/SINR on LTE).
+- **SIM not ready / not detected.** `SIM not inserted` (state `failed`, reason `sim-missing`) right after power-on is
+  usually the same early-probe race, and `uconsole-4g-cm4.sh enable` recovers from it by restarting ModemManager. If it
+  persists, reseat the SIM.
+- **Operator-side disconnects.** `LCP terminated by peer` in the pppd log means the network closed the session.
+  NetworkManager reconnects on its own within a few seconds.
+
 ## Related discussions
 
 No ready-made fix for these uConsole problems turned up in forums, but the following threads describe the same symptoms:
