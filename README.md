@@ -101,14 +101,17 @@ workarounds cannot fix them:
 
 ## Related discussions
 
-No ready-made fix for these uConsole problems turned up in forums, but the following threads describe the same symptoms:
+I found no ready-made fix for these uConsole problems. These threads are related:
 
 - "IPv4 is unsupported by the modem" / empty supported IP families on other modems:
   [modemmanager-devel, Mar 2024](https://lists.freedesktop.org/archives/modemmanager-devel/2024-March/009845.html),
   [modemmanager-devel, Feb 2024](https://lists.freedesktop.org/archives/modemmanager-devel/2024-February/009836.html),
   [ModemManager issue 705](https://gitlab.freedesktop.org/mobile-broadband/ModemManager/-/issues/705) (u-blox R412m, IP capabilities not detected over serial)
-- uConsole 4G module setup (modem detection): [ClockworkPi forum](https://forum.clockworkpi.com/t/how-do-i-configure-use-the-4g-module/10431)
-- uConsole with an HDMI monitor (manual ARandR layout): [ClockworkPi forum](https://forum.clockworkpi.com/t/uconsole-with-hdmi-portable-monitor/13893)
+- uConsole 4G module setup: [ClockworkPi forum](https://forum.clockworkpi.com/t/how-do-i-configure-use-the-4g-module/10431).
+  The log in post #3 also shows `couldn't load supported IP families: Unknown error` on a SIM7600G-H, but the cause
+  there was a PIN-locked SIM, not the probing race described here.
+- Making an external monitor the main screen (manual ARandR layout, no automation):
+  [ClockworkPi forum](https://forum.clockworkpi.com/t/uconsole-with-hdmi-portable-monitor/13893)
 
 ## License
 
