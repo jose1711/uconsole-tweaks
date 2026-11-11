@@ -91,8 +91,8 @@ workarounds cannot fix them:
   (`failed to connect modem: Network timeout`), and the modem may reset and re-enumerate on USB again and again.
   A larger external antenna, a better position (near a window, not covered by a hand or a case) or another band or
   operator helps.
-  Check with: `mmcli -m any | grep -E 'signal|access tech'`, or for detailed values
-  `mmcli -m any --signal-setup=5 && mmcli -m any --signal-get` (RSRP/RSRQ/SINR on LTE).
+  Check with: `mmcli -m any | grep -E 'signal|access tech'`. With the SIM7600 on the AT/PPP setup, ModemManager only
+  reports the signal as a percentage; `--signal-get` returns no RSRP/RSRQ/SINR values.
 - **SIM not ready / not detected.** `SIM not inserted` (state `failed`, reason `sim-missing`) right after power-on is
   usually the same early-probe race, and `uconsole-4g-cm4.sh enable` recovers from it by restarting ModemManager. If it
   persists, reseat the SIM.
