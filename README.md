@@ -58,6 +58,21 @@ Uses the original `uconsole-4g-cm4.sh.orig` for power sequencing (so the workaro
 `results.csv` (result, ModemManager time-to-ready, connect time, MM retries per cycle) and prints a summary. Each cycle takes 2-3 minutes,
 drops the LTE link, and should be run on a charger. `stock`/`ab` install the Debian ModemManager `.deb` temporarily.
 
+### Results
+
+`-m ab -n 20` on a uConsole CM4 with a SIM7600G-H, 2026-11-11:
+
+| Build | MM initialized | Connected | Retry used |
+|---|---|---|---|
+| stock 1.24.0-1+deb13u1 | 4/20 | 4/20 | – |
+| 1.24.0 + retry patch | 20/20 | 19/20 | 11/20 |
+
+- Stock failed in 16 of 20 cycles: 15 × empty supported IP families, 1 × modem in `failed` state.
+- With the patch, 11 cycles needed one retry of `AT+CGDCONT=?`, and each of them would have failed otherwise. Time from
+  power-on to an initialized modem was 27–31 s for both builds, so the retry adds no measurable delay.
+- The single patched connection failure came from the test itself: `nmcli con up` interrupted an activation
+  NetworkManager had just started on its own (`primary AT port is already connected`), not from ModemManager.
+
 ## Related discussions
 
 No ready-made fix for these uConsole problems turned up in forums, but the following threads describe the same symptoms:
