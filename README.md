@@ -103,6 +103,10 @@ workarounds cannot fix them:
 
 I found no ready-made fix for these uConsole problems. These threads are related:
 
+- The same intermittent error on a uConsole ("connection requested both IPv4 and IPv6 dual stack addressing which is
+  unsupported by the modem", which later went away by itself):
+  [ClockworkPi forum, Apr 2026](https://forum.clockworkpi.com/t/4g-problem-with-trixie-6-12-and-telekom/22234)
+
 - "IPv4 is unsupported by the modem" / empty supported IP families on other modems:
   [modemmanager-devel, Mar 2024](https://lists.freedesktop.org/archives/modemmanager-devel/2024-March/009845.html),
   [modemmanager-devel, Feb 2024](https://lists.freedesktop.org/archives/modemmanager-devel/2024-February/009836.html),
