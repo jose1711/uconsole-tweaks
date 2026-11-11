@@ -18,6 +18,7 @@ and uconsole-sleep patches were written by Claude, not by me. All commits carry 
 | `patches/modemmanager-retry-supported-ip-families.patch` | ModemManager 1.24.0 (Debian) patch: retries loading supported IP families while the SIM7600 firmware is still booting. Without it NetworkManager fails with "IPv4 is unsupported by the modem". |
 | `patches/uconsole-4g-cm4-modem-workarounds.patch` | Patch for `/usr/local/bin/uconsole-4g-cm4.sh`: restarts ModemManager if the modem is `failed`/has empty IP families, falls back to `nmcli con up radost`, desktop notifications. |
 | `patches/uconsole-sleep-ignore-powerkey-with-external-display.patch` | Patch for `/usr/local/lib/uconsole-sleep/sleep_remap_powerkey.py`: short power-key press is ignored while an external display is connected (blanking the panel is a DRM hotplug that makes X re-enable it unrotated). |
+| `patches/uconsole-sleep-power-control-external-display.patch` | Patch for `/usr/local/lib/uconsole-sleep/sleep_power_control.py`: no power saving (keyboard unbound, CPU capped) while an external display is connected, even though the internal panel is off. Power saving starts only after about 3 s of "screen off, no external display". Proposed upstream as [uConsole-sleep#6](https://github.com/qkdxorjs1002/uConsole-sleep/pull/6) (fixes [#3](https://github.com/qkdxorjs1002/uConsole-sleep/issues/3)); not needed once that is merged and installed. |
 
 ## Install
 
@@ -36,6 +37,11 @@ patch /usr/local/bin/uconsole-4g-cm4.sh < patches/uconsole-4g-cm4-modem-workarou
 dpkg-divert --local --rename --add /usr/local/lib/uconsole-sleep/sleep_remap_powerkey.py
 cp /usr/local/lib/uconsole-sleep/sleep_remap_powerkey.py.distrib /usr/local/lib/uconsole-sleep/sleep_remap_powerkey.py
 patch /usr/local/lib/uconsole-sleep/sleep_remap_powerkey.py < patches/uconsole-sleep-ignore-powerkey-with-external-display.patch
+# power saving: divert the packaged file likewise
+dpkg-divert --local --rename --add /usr/local/lib/uconsole-sleep/sleep_power_control.py
+cp /usr/local/lib/uconsole-sleep/sleep_power_control.py.distrib /usr/local/lib/uconsole-sleep/sleep_power_control.py
+patch /usr/local/lib/uconsole-sleep/sleep_power_control.py < patches/uconsole-sleep-power-control-external-display.patch
+systemctl restart sleep-power-control
 ```
 
 The paths in the sleep patch header may need adjusting. ModemManager has to be rebuilt:
