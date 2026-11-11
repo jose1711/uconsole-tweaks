@@ -1,8 +1,8 @@
 #!/bin/bash
-# xfce4-genmon: dátový prenos cez ppp0 (vnstat)
+# xfce4-genmon: data usage over ppp0 (vnstat)
 IF=ppp0
-LIMIT_GB=4      # dátový balík (Radosť 4 GB)
-CYCLE_DAY=14    # deň v mesiaci, kedy sa balík obnovuje (nastav podľa Radosti)
+LIMIT_GB=4      # data plan size (Radosť 4 GB)
+CYCLE_DAY=14    # day of month the plan renews (set to match your operator)
 export LANG=C LC_ALL=C
 
 json=$(vnstat --json a -i "$IF" 2>/dev/null)
@@ -11,7 +11,7 @@ if [ -z "$json" ] || ! jq -e '.interfaces[0]' <<<"$json" >/dev/null 2>&1; then
     exit 0
 fi
 
-# --- jedno jq volanie: všetky čísla v bajtoch ---
+# --- a single jq call: all numbers in bytes ---
 read -r m_rx m_tx t_rx t_tx mday < <(jq -r --arg now "$(date +%Y-%m-%d)" '
   .interfaces[0].traffic as $t
   | ($t.month | last) as $m
@@ -25,20 +25,20 @@ hum() { awk -v b="$1" 'BEGIN{
   else if(b>=1048576) printf "%.0f MB", b/1048576;
   else printf "%.0f kB", b/1024 }'; }
 
-spark() { # vstup: čísla na riadkoch
+spark() { # input: one number per line
   awk 'BEGIN{split("▁ ▂ ▃ ▄ ▅ ▆ ▇ █",c," ")}
        {v[NR]=$1; if($1>m)m=$1}
        END{for(i=1;i<=NR;i++){k=(m>0)?int(v[i]/m*7)+1:1; if(k>8)k=8; printf "%s", c[k]} print ""}'; }
 
 t_tot=$((t_rx + t_tx))
 
-# posledných 7 kalendárnych dní (vnstat vynecháva dni bez prenosu)
+# last 7 calendar days (vnstat omits days without traffic)
 declare -A dtot
 while read -r d b; do dtot[$d]=$b; done < <(jq -r '.interfaces[0].traffic.day[] | "\(.date.year)-\("0\(.date.month)"[-2:])-\("0\(.date.day)"[-2:]) \(.rx+.tx)"' <<<"$json")
 g7=$(for i in 6 5 4 3 2 1 0; do echo "${dtot[$(date -d "-$i day" +%F)]:-0}"; done | spark)
 y_tot=${dtot[$(date -d yesterday +%F)]:-0}
 
-# súčet za aktuálne obdobie balíka (od CYCLE_DAY)
+# total for the current plan period (since CYCLE_DAY)
 cd_=$(printf %02d "$CYCLE_DAY")
 if [ "$(date +%d)" -ge "$CYCLE_DAY" ]; then start=$(date +%Y-%m-)$cd_; else start=$(date -d "$(date +%Y-%m-01) -1 month" +%Y-%m-)$cd_; fi
 end=$(date -d "$start +1 month" +%F)
@@ -55,7 +55,7 @@ g24=$(jq -r '.interfaces[0].traffic.hour[-24:][] | (.rx+.tx)' <<<"$json" | spark
 peak_d=; peak_b=0
 for d in "${!dtot[@]}"; do [ "${dtot[$d]}" -gt "$peak_b" ] && { peak_b=${dtot[$d]}; peak_d=$d; }; done
 
-# farba podľa % z limitu (>=60 % oranžová, >=85 % červená)
+# colour by % of the limit (>=60 % orange, >=85 % red)
 col=green
 [ "$pct" -ge 60 ] && col=orange
 [ "$pct" -ge 85 ] && col=red
