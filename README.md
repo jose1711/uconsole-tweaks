@@ -3,6 +3,10 @@
 Small fixes and helpers for a ClockworkPi **uConsole (CM4)** running Debian 13 / XFCE with the
 SIM7600G-H LTE module. Tested on one device only; read before you apply anything as root.
 
+The code, patches and documentation here were created with Claude (Anthropic's AI assistant, in Claude Code) at my
+request. I described the problems and tested the results on my uConsole. The root-cause analysis and the ModemManager
+and uconsole-sleep patches were written by Claude, not by me. All commits carry a `Co-Authored-By: Claude` line.
+
 ## Contents
 
 | Path | What it does |
